@@ -182,7 +182,6 @@ function defineVideoController() {
     target.playbackRate = storedSpeed;
 
     this.div = this.initializeControls();
-
     target.addEventListener(
       "play",
       (this.handlePlay = function(event) {
@@ -211,6 +210,9 @@ function defineVideoController() {
         // with the site's default behavior)
         log("Explicitly setting playbackRate to: " + storedSpeed, 4);
         event.target.playbackRate = storedSpeed;
+
+        console.error("assdasdass");
+        //myINIT(document)
       }.bind(this))
     );
 
@@ -363,6 +365,7 @@ function isBlacklisted() {
 }
 
 var coolDown = false;
+
 function refreshCoolDown() {
   log("Begin refreshCoolDown", 5);
   if (coolDown) {
@@ -415,20 +418,30 @@ function initializeWhenReady(document) {
   }
   window.onload = () => {
     initializeNow(window.document);
+    console.error(1);
   };
   if (document) {
     if (document.readyState === "complete") {
       initializeNow(document);
+      console.error(2);
+      myINIT(document);
+
+
     } else {
       document.onreadystatechange = () => {
         if (document.readyState === "complete") {
           initializeNow(document);
+          console.error(3);
+
+          myINIT(document);
+
         }
       };
     }
   }
   log("End initializeWhenReady", 5);
 }
+
 function inIframe() {
   try {
     return window.self !== window.top;
@@ -436,8 +449,10 @@ function inIframe() {
     return true;
   }
 }
+
 function getShadow(parent) {
   let result = [];
+
   function getChild(parent) {
     if (parent.firstElementChild) {
       var child = parent.firstElementChild;
@@ -451,9 +466,11 @@ function getShadow(parent) {
       } while (child);
     }
   }
+
   getChild(parent);
   return result.flat(Infinity);
 }
+
 function getController(id) {
   return getShadow(document.body).filter(x => {
     return (
@@ -491,7 +508,8 @@ function initializeNow(document) {
   var docs = Array(document);
   try {
     if (inIframe()) docs.push(window.top.document);
-  } catch (e) {}
+  } catch (e) {
+  }
 
   docs.forEach(function(doc) {
     doc.addEventListener(
@@ -644,6 +662,60 @@ function initializeNow(document) {
   log("End initializeNow", 5);
 }
 
+function arrayMax(arr) {
+  return -arr.reduce(function(p, v) {
+    return (p < v ? p : v);
+  });
+}
+
+ddddtimeout = 100;
+timeout = 0;
+var oldVolume;
+var minm = 9999999999;
+
+function test() {
+  if (timeout > 0) timeout = timeout - 1;
+  var dataArray = new Uint8Array(32);
+
+
+  analyser.getByteFrequencyData(dataArray);
+
+  sss = dataArray.reduce((a, b) => a + b, 0);
+  if (sss < minm && sss > 400) minm = sss;
+  mymax = sss > (minm + 50);//.slice(10,32)
+
+  //console.error(sss, minm);
+
+  if (bbbb !== mymax) {
+    if (mymax) {
+      //timeout = ddddtimeout;
+      video.playbackRate = Number(1);
+      video.volume = oldVolume;
+      bbbb = mymax;
+
+    } else {
+      //if (timeout === 0) {
+      console.error(timeout);
+      // timeout = ddddtimeout;
+      video.playbackRate = Number(5);
+      oldVolume = video.volume;
+      video.volume = 0.001;
+      bbbb = mymax;
+      //}
+    }
+
+  }
+
+
+  //oldmymax.push(mymax);
+}
+
+
+var bbbb = false;
+var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+var analyser = audioCtx.createAnalyser();
+var video;
+
 function setSpeed(controller, video, speed) {
   log("setSpeed started: " + speed, 5);
   var speedvalue = speed.toFixed(2);
@@ -651,6 +723,48 @@ function setSpeed(controller, video, speed) {
   refreshCoolDown();
   log("setSpeed finished: " + speed, 5);
 }
+
+function myINIT(document) {
+  log("runAction Begin", 5);
+
+  if (tc.settings.audioBoolean) {
+    var mediaTags = getShadow(document.body).filter(x => {
+      return x.tagName == "AUDIO" || x.tagName == "VIDEO";
+    });
+  } else {
+    var mediaTags = getShadow(document.body).filter(x => x.tagName == "VIDEO");
+  }
+
+  mediaTags.forEach = Array.prototype.forEach;
+
+  mediaTags.forEach(function(v) {
+    if (!v.classList.contains("vsc-cancelled"))
+      video = v;
+    oldVolume = video.volume;
+  });
+
+  analyser.fftSize = 32;
+  mediastream = video.captureStream();
+  //mediastream.currentTime = 10;
+  if (mediastream == null) myINIT(document);
+  else {
+    node = audioCtx.createMediaStreamSource(mediastream);
+    node.connect(analyser);
+    mediastream.getVideoTracks().forEach(a => {
+      a.enabled = false;
+      //mediastream.addTrack(a.clone());
+      //console.error(a.stop());
+    });
+
+    if (timerd != null) {
+      clearInterval(timerd);
+      timerd = null;
+    }
+    timerd = setInterval(test, 10);
+  }
+}
+
+var timerd;
 
 function runAction(action, document, value, e) {
   log("runAction Begin", 5);
@@ -763,15 +877,15 @@ function resetSpeed(v, controller, target) {
         log("Resetting playback speed to 1.0", 4);
         setSpeed(controller, v, 1.0);
       } else {
-        log('Toggling playback speed to "fast" speed', 4);
+        log("Toggling playback speed to \"fast\" speed", 4);
         setSpeed(controller, v, getKeyBindings("fast"));
       }
     } else {
-      log('Toggling playback speed to "reset" speed', 4);
+      log("Toggling playback speed to \"reset\" speed", 4);
       setSpeed(controller, v, getKeyBindings("reset"));
     }
   } else {
-    log('Toggling playback speed to "reset" speed', 4);
+    log("Toggling playback speed to \"reset\" speed", 4);
     setKeyBindings("reset", v.playbackRate);
     setSpeed(controller, v, target);
   }
@@ -802,7 +916,7 @@ function handleDrag(video, controller, e) {
     parentElement.parentNode &&
     parentElement.parentNode.offsetHeight === parentElement.offsetHeight &&
     parentElement.parentNode.offsetWidth === parentElement.offsetWidth
-  ) {
+    ) {
     parentElement = parentElement.parentNode;
   }
 
@@ -839,6 +953,7 @@ function handleDrag(video, controller, e) {
 
 var timer;
 var animation = false;
+
 function showController(controller) {
   log("Showing controller", 4);
   controller.classList.add("vcs-show");
